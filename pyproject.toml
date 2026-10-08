@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bangla-ai"
+version = "0.1.0"
+description = "Official Python SDK for the Bangla AI Gateway (LLM, OCR, ASR, TTS, STS)."
+readme = "README.md"
+license = "MIT"
+authors = [
+  { name = "Jayed", email = "jayedbinjahangir@gmail.com" }
+]
+dependencies = [
+  "httpx>=0.25.0",
+  "pydantic>=2.0.0",
+  "python-dotenv",
+]
+
+requires-python = ">=3.9"
+
+[project.urls]
+Homepage = "https://github.com/jayeeed/bangla-ai-sdk-python"
+Repository = "https://github.com/jayeeed/bangla-ai-sdk-python"
+Documentation = "https://banglai.acimisai.com/api/docs"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bangla_ai*"]
