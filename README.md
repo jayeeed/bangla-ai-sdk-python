@@ -1,9 +1,9 @@
-# Bangla AI Python SDK (`bangla-ai`)
+# Bangla AI Python SDK (`bangla-ai-sdk`)
 
 ![Async](https://img.shields.io/badge/async-supported-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/badge/pypi-0.1.0-orange.svg)](https://pypi.org/project/bangla-ai/)
+[![PyPI version](https://img.shields.io/badge/pypi-0.1.0-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
 
 Official Python SDK for the **Bangla AI Gateway**. Easily connect your Python applications to state-of-the-art Bengali language AI microservices:
 - 💬 **Large Language Model (LLM)**: Multi-branch conversation trees and token-by-token SSE streaming.
@@ -27,14 +27,14 @@ Official Python SDK for the **Bangla AI Gateway**. Easily connect your Python ap
 ## 📦 Installation
 
 ```bash
-pip install bangla-ai
+pip install bangla-ai-sdk
 ```
 
 Or for local development / installation from source:
 
 ```bash
-git clone https://github.com/jayeeed/bangla-ai.git
-cd bangla-ai
+git clone https://github.com/jayeeed/bangla-ai-sdk-python.git
+cd bangla-ai-sdk-python
 pip install -e .
 ```
 
