@@ -3,7 +3,7 @@
 ![Async](https://img.shields.io/badge/async-supported-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/badge/pypi-0.1.0-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
+[![PyPI version](https://img.shields.io/badge/pypi-0.1.1-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
 
 Official Python SDK for the **Bangla AI Gateway**. Easily connect your Python applications to state-of-the-art Bengali language AI microservices:
 - 💬 **Large Language Model (LLM)**: Multi-branch conversation trees and token-by-token SSE streaming.
@@ -44,7 +44,7 @@ pip install -e .
 
 ### 1. Configure Environment
 
-Copy [.env.example](file:///office/production_deployment/bangla-ai-gateway/sdk/python/.env.example) to `.env` and set your API key:
+Copy [.env.example](.env.example) to `.env` and set your API key:
 
 ```bash
 cp .env.example .env
@@ -73,8 +73,8 @@ print(f"Logged in as: {me.display_name} ({me.email}) - Tier: {me.plan}")
 
 # 2. Chat with the Bengali LLM
 chat = client.chats.create(title="Introduction")
-turn = client.chats.turns.create(chat.id, content="বাংলা ব্যাকরণ অনুযায়ী সমাস কাকে বলে?")
-print("AI:", turn.content)
+reply = client.chats.turns.create(chat.id, content="বাংলা ব্যাকরণ অনুযায়ী সমাস কাকে বলে?")
+print("AI:", reply)
 ```
 
 #### Asynchronous Example
@@ -140,7 +140,7 @@ reply = client.chats.turns.create(
     content="এই ইনভয়েসের মোট টাকার পরিমাণ কত?",
     attachment_ids=[att.id]
 )
-print(reply.content)
+print("AI:", reply)
 ```
 
 ---
@@ -185,6 +185,23 @@ yt_result = client.asr.transcribe_youtube(
 )
 print("Video Title:", yt_result.title)
 print("Diarization:", yt_result.diarization_text)
+```
+
+#### Real-Time PCM16 Audio Stream
+```python
+# 1. Initialize streaming session
+session = client.asr.create_stream(sample_rate=16000)
+
+# 2. Stream 16kHz mono PCM chunks
+chunk = client.asr.stream_chunk(
+    session_id=session.session_id,
+    pcm_bytes=pcm_buffer,
+    chunk_sequence=1
+)
+print("Partial:", chunk.partial_text)
+
+# 3. Finalize stream
+client.asr.finish_stream(session.session_id)
 ```
 
 ---

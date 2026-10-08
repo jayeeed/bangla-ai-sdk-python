@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bangla-ai-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Official Python SDK for the Bangla AI Gateway (LLM, OCR, ASR, TTS, STS)."
 readme = "README.md"
 license = "MIT"
