@@ -1,13 +1,17 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserProfile(BaseModel):
     """User profile information returned by the gateway."""
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     email: Optional[str] = None
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    preferences: Dict[str, Any] = Field(default_factory=dict)
     role: str = "user"
     plan: str = "free"
     is_active: bool = True
@@ -19,8 +23,10 @@ class UserProfile(BaseModel):
 
 class ApiKey(BaseModel):
     """Developer API key metadata."""
+    model_config = ConfigDict(extra="ignore")
+
     id: str
-    user_id: str
+    user_id: Optional[str] = None
     name: str
     key_prefix: str
     scopes: List[str] = Field(default_factory=list)
@@ -36,8 +42,21 @@ class ApiKey(BaseModel):
 
 class WsTicket(BaseModel):
     """Single-use ticket for authenticating WebSockets."""
+    model_config = ConfigDict(extra="ignore")
+
     ticket: str
     target: str
     stream_session_id: Optional[str] = None
     expires_at: Optional[datetime] = None
     ttl_seconds: int = 30
+
+
+class GoogleAuthSyncResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    status: str = "synced"
+    user: Optional[UserProfile] = None
+    synced: bool = True
+    provider: str = "google"
+    tier: str = "free"
+    scopes: List[str] = Field(default_factory=list)

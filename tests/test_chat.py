@@ -10,19 +10,39 @@ def test_chat_lifecycle_and_streaming(mock_client):
     assert chat.id == "cht_test123"
     assert chat.title == "Test Conversation"
 
-    # 2. List chats
+    # 2. List & Get
     chats = mock_client.chats.list()
     assert len(chats) >= 1
 
-    # 3. Stream turn
+    single_chat = mock_client.chats.get(chat.id)
+    assert single_chat.id == chat.id
+
+    # 3. Update chat
+    updated = mock_client.chats.update(chat.id, title="Updated title")
+    assert updated.title == "Updated title"
+
+    # 4. Stream turn (asserting auto idempotency key)
     chunks = list(mock_client.chats.turns.stream(chat.id, content="হ্যালো"))
     assert len(chunks) >= 2
     tokens = [c.text for c in chunks if c.text]
     assert "".join(tokens) == "বাংলা এআই"
 
-    # 4. Convenience non-streaming turn
+    # 5. Convenience non-streaming turn
     full_text = mock_client.chats.turns.create(chat.id, content="নমস্কার")
     assert full_text == "বাংলা এআই"
+    assert full_text.content == "বাংলা এআই"
+    assert full_text.turn_id == "trn_test123"
+
+    # 6. Retrieve message history
+    msgs = mock_client.chats.messages(chat.id)
+    assert len(msgs) >= 1
+    assert msgs[0].content == "নমস্কার! কিভাবে সাহায্য করতে পারি?"
+
+    # 7. Create branch
+    branched = mock_client.chats.create_branch(
+        chat.id, source_branch_id="brn_test123", target_turn_id="trn_test123"
+    )
+    assert branched.active_branch_id == "brn_branch456"
 
 
 def test_chat_attachments(mock_client):
@@ -33,3 +53,6 @@ def test_chat_attachments(mock_client):
 
     downloaded = mock_client.chats.attachments.download("cht_test123", att.id)
     assert b"PDF" in downloaded
+
+    # Delete attachment
+    mock_client.chats.attachments.delete("cht_test123", att.id)

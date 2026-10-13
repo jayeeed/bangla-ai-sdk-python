@@ -1,5 +1,6 @@
 from .api_keys import ApiKeysResource, AsyncApiKeysResource
 from .asr import ASRResource, AsyncASRResource
+from .auth import AsyncAuthResource, AuthResource
 from .chats import AsyncChatsResource, ChatsResource
 from .me import AsyncMeResource, MeResource
 from .ocr import AsyncOCRResource, OCRResource
@@ -10,6 +11,8 @@ from .ws_tickets import AsyncWsTicketsResource, WsTicketsResource
 __all__ = [
     "MeResource",
     "AsyncMeResource",
+    "AuthResource",
+    "AsyncAuthResource",
     "ApiKeysResource",
     "AsyncApiKeysResource",
     "WsTicketsResource",

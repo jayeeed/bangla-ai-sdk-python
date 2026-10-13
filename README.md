@@ -1,40 +1,43 @@
-# Bangla AI Python SDK (`bangla-ai-sdk`)
+# Bangla AI Python SDK (`bangla-ai`)
 
 ![Async](https://img.shields.io/badge/async-supported-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/badge/pypi-0.1.1-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
+[![PyPI version](https://img.shields.io/badge/pypi-0.1.0-orange.svg)](https://pypi.org/project/bangla-ai/)
 
 Official Python SDK for the **Bangla AI Gateway**. Easily connect your Python applications to state-of-the-art Bengali language AI microservices:
-- 💬 **Large Language Model (LLM)**: Multi-branch conversation trees and token-by-token SSE streaming.
-- 📄 **Document OCR**: High-accuracy Bengali document parsing with layout detection, bounding boxes, and Markdown output.
-- 🎙️ **Speech-to-Text (ASR)**: Nemotron Bengali ASR for offline audio files, YouTube transcription, and real-time streams.
-- 🔊 **Speech Synthesis (TTS)**: Higgs TTS 3 (4B) neural voice synthesis returning 24 kHz WAV/PCM audio and zero-shot voice cloning.
-- 🗣️ **Speech-to-Speech (STS)**: LiveKit SFU room token minting and custom voice clone references.
+- 💬 **Large Language Model (LLM)**: Multi-branch conversation trees, message turn history, automatic idempotency keys, and token-by-token SSE streaming.
+- 📄 **Document OCR**: High-accuracy Bengali document parsing with layout detection, bounding boxes, synchronous processing, and asynchronous batch jobs.
+- 🎙️ **Speech-to-Text (ASR)**: Nemotron Bengali ASR for offline audio files, asynchronous batch jobs, YouTube transcription, and live 16 kHz PCM16 streaming.
+- 🔊 **Speech Synthesis (TTS)**: Higgs TTS 3 (4B) neural voice synthesis returning 24 kHz WAV/PCM audio, asynchronous jobs, zero-shot voice cloning, and stateful incremental text sessions.
+- 🗣️ **Speech-to-Speech (STS)**: LiveKit SFU WebRTC room token minting and zero-shot custom voice conditioning.
+- 🔐 **Auth & API Keys**: User profiles, Google/Firebase authentication synchronization, API keys CRUD, and single-use WebSocket tickets.
 
 ---
 
 ## 🚀 Features
 
-- **✅ Sync & Async Clients**: Built on top of `httpx`, providing parallel `BanglaAI` and `AsyncBanglaAI` interfaces.
+- **✅ Sync & Async Clients**: Built on top of `httpx`, providing parallel `BanglaAI` and `AsyncBanglaAI` interfaces with 100% feature parity.
 - **⚡ Real-Time Streaming**: First-class Server-Sent Events (SSE) streaming for LLM tokens and 24 kHz raw PCM audio chunks for TTS.
-- **🛡️ Robust Error Handling**: Clean RFC 7807 typed exceptions (`RateLimitError`, `AuthenticationError`, `UpstreamServiceError`, etc.) with automatic retry on transient failures.
+- **🔄 Long-Running Async Jobs**: High-level `wait_for_job()` helpers for ASR, OCR, and TTS async batch jobs with automatic polling and error resolution.
+- **🎙️ Live ASR Streaming**: Stateful sessions supporting raw 16 kHz mono signed 16-bit PCM chunks with generation-based checkpointing.
+- **🗣️ Reusable Voice Cloning**: Upload short reference audio samples once and reuse the generated `voice_id` across TTS and STS.
+- **🛡️ Robust Error Handling**: Clean RFC 7807 typed exceptions (`RateLimitError`, `AuthenticationError`, `UpstreamServiceError`, etc.) with automatic exponential backoff retry.
 - **🔐 Flexible Authentication**: Auto-discovers credentials from `BANGLA_AI_API_KEY` environment variables or `.env` file via `python-dotenv`.
-- **📦 PyPI Deploy Ready**: Out-of-the-box PEP 621 `pyproject.toml`, automated GitHub Actions workflow, and smoke verification suite.
 
 ---
 
 ## 📦 Installation
 
 ```bash
-pip install bangla-ai-sdk
+pip install bangla-ai
 ```
 
-Or for local development / installation from source:
+Or for local development:
 
 ```bash
-git clone https://github.com/jayeeed/bangla-ai-sdk-python.git
-cd bangla-ai-sdk-python
+git clone https://github.com/jayeeed/bangla-ai.git
+cd bangla-ai/sdk/python
 pip install -e .
 ```
 
@@ -44,7 +47,7 @@ pip install -e .
 
 ### 1. Configure Environment
 
-Copy [.env.example](.env.example) to `.env` and set your API key:
+Copy `.env.example` to `.env` and set your API key:
 
 ```bash
 cp .env.example .env
@@ -64,7 +67,7 @@ from bangla_ai import BanglaAI
 
 load_dotenv()
 
-# Automatically reads BANGLA_AI_API_KEY from .env / environment
+# Automatically reads BANGLA_AI_API_KEY from environment
 client = BanglaAI()
 
 # 1. Check identity
@@ -73,8 +76,8 @@ print(f"Logged in as: {me.display_name} ({me.email}) - Tier: {me.plan}")
 
 # 2. Chat with the Bengali LLM
 chat = client.chats.create(title="Introduction")
-reply = client.chats.turns.create(chat.id, content="বাংলা ব্যাকরণ অনুযায়ী সমাস কাকে বলে?")
-print("AI:", reply)
+turn = client.chats.turns.create(chat.id, content="বাংলা ব্যাকরণ অনুযায়ী সমাস কাকে বলে?")
+print("AI:", turn.content)
 ```
 
 #### Asynchronous Example
@@ -100,16 +103,6 @@ asyncio.run(main())
 
 ---
 
-## 🧪 Smoke Testing
-
-Run the included verification script to test your gateway connection and verify sync and async operations:
-
-```bash
-python test.py
-```
-
----
-
 ## 📖 Complete Modality Guide
 
 ### 1. LLM & Conversational Chat
@@ -121,26 +114,39 @@ chat = client.chats.create(
     instructions="আপনি একজন অভিজ্ঞ পাইথন প্রোগ্রামার। প্রাতিষ্ঠানিক বাংলায় উত্তর দিন।"
 )
 
-# Stream tokens in real time
+# Stream tokens in real time (automatically includes RFC 4122 Idempotency-Key)
 for chunk in client.chats.turns.stream(chat.id, content="পাইথনে ডেকোরেটর কী এবং এটি কীভাবে কাজ করে?"):
     if chunk.text:
         print(chunk.text, end="", flush=True)
 print()
 ```
 
-#### Uploading Chat Attachments (PDF / Images)
+#### Uploading Chat Attachments & Message History
 ```python
 # Upload document to MinIO
 att = client.chats.attachments.upload(chat.id, "invoice.pdf")
 print(f"Attached: {att.filename} ({att.size_bytes} bytes)")
 
-# Submit message referencing the attachment
+# Submit message referencing attachment
 reply = client.chats.turns.create(
     chat.id,
     content="এই ইনভয়েসের মোট টাকার পরিমাণ কত?",
     attachment_ids=[att.id]
 )
-print("AI:", reply)
+print("AI:", reply.content)
+
+# Retrieve full message turn history
+history = client.chats.messages(chat.id)
+for turn in history:
+    print(f"[{turn.status}] User: {turn.input_content} -> AI: {turn.output_text}")
+
+# Fork conversation history into a new branch
+branch = client.chats.create_branch(
+    chat.id,
+    source_branch_id=chat.active_branch_id,
+    target_turn_id=reply.turn_id,
+    action="regenerate"
+)
 ```
 
 ---
@@ -152,7 +158,7 @@ print("AI:", reply)
 result = client.ocr.process("nid_card.jpg")
 print("Extracted Markdown:\n", result.markdown)
 
-# Inspect individual layout regions
+# Inspect layout regions and bounding boxes
 for page in result.pages:
     for region in page.regions:
         print(f"[{region.label}] ({region.box_2d}): {region.text}")
@@ -177,6 +183,13 @@ print("Transcript:", result.text)
 print(f"Duration: {result.duration_seconds}s | Processed in: {result.processing_time_ms}ms")
 ```
 
+#### Asynchronous Audio Transcription (for Long Files)
+```python
+# Submit job and poll until completion
+job_status = client.asr.wait_for_job("long_lecture_2hours.mp3", diarize=True)
+print("Finished ASR:", job_status.result["text"])
+```
+
 #### YouTube Video Audio Transcription
 ```python
 yt_result = client.asr.transcribe_youtube(
@@ -187,21 +200,19 @@ print("Video Title:", yt_result.title)
 print("Diarization:", yt_result.diarization_text)
 ```
 
-#### Real-Time PCM16 Audio Stream
+#### Live 16 kHz PCM16 Streaming
 ```python
-# 1. Initialize streaming session
+# 1. Start streaming session
 session = client.asr.create_stream(sample_rate=16000)
 
-# 2. Stream 16kHz mono PCM chunks
-chunk = client.asr.stream_chunk(
-    session_id=session.session_id,
-    pcm_bytes=pcm_buffer,
-    chunk_sequence=1
-)
+# 2. Feed 16-bit mono PCM chunks as they arrive from microphone
+chunk = client.asr.stream_chunk(session.session_id, pcm_bytes)
 print("Partial:", chunk.partial_text)
+if chunk.final_text:
+    print("Final segment:", chunk.final_text)
 
 # 3. Finalize stream
-client.asr.finish_stream(session.session_id)
+res = client.asr.finish_stream(session.session_id)
 ```
 
 ---
@@ -225,20 +236,45 @@ for pcm_chunk in client.tts.stream_pcm("বাংলা ভাষার জন�
     send_to_audio_hardware(pcm_chunk)
 ```
 
-#### Zero-Shot Voice Cloning
+#### Reusable Voice Cloning & Upload
 ```python
-from bangla_ai.types import CustomReferenceAudio
+# Upload 3-10s audio clip to create a reusable voice profile
+voice_info = client.tts.create_voice("my_voice_sample.wav", name="My Voice")
+voice_id = voice_info.voice_id
 
-# Clone a voice from reference audio base64
-custom_ref = CustomReferenceAudio(
-    audio_base64="UklGRiQAAABXQVZFZm10IBAAAA...",
-    transcript="রেফারেন্স অডিওতে বলা বাক্য"
-)
+# Synthesize speech using the cloned voice ID
+audio_bytes = client.tts.synthesize("আমার ক্লোন করা কণ্ঠে এই বাক্যটি বলা হচ্ছে।", voice_id=voice_id)
+```
 
-audio_bytes = client.tts.advanced(
-    input="ক্লোন করা কণ্ঠস্বরে তৈরি বাক্য।",
-    custom_reference=custom_ref
-)
+#### Asynchronous Synthesis Batch Jobs
+```python
+# Enqueue long paragraph and wait for synthesized audio
+audio_bytes = client.tts.wait_for_job("দীর্ঘ বাংলা অনুচ্ছেদ যা সিন্থেসাইজ হতে সময় নেয়।")
+with open("long_speech.wav", "wb") as f:
+    f.write(audio_bytes)
+```
+
+#### Incremental Text Streaming Sessions
+```python
+# Create low-latency incremental session
+session = client.tts.create_session(voice="male")
+
+# Feed LLM tokens as they arrive
+client.tts.send_session_text(session.session_id, "প্রথম বাক্য।")
+client.tts.send_session_text(session.session_id, "দ্বিতীয় বাক্য।")
+
+# Finish session
+client.tts.finish_session(session.session_id)
+client.tts.delete_session(session.session_id)
+```
+
+#### Discover Capabilities & Queue Load
+```python
+caps = client.tts.capabilities()
+print("Supported formats:", caps.response_formats)
+
+queue = client.tts.queue()
+print(f"Queue load: {queue.active} active / {queue.capacity} capacity")
 ```
 
 ---
@@ -251,21 +287,25 @@ voice_ref = client.sts.upload_voice_reference("my_voice.wav")
 print(f"Voice Reference ID: {voice_ref.reference_id}")
 
 # 2. Mint LiveKit Room Token
-room_access = client.sts.get_livekit_token(reference_id=voice_ref.reference_id)
+room_access = client.sts.create_token(reference_id=voice_ref.reference_id, room_name="my-room")
 print("LiveKit URL:", room_access.url)
 print("Access Token:", room_access.token)
 print("Allocated Room:", room_access.room)
 
-# Pass `url` and `token` to any LiveKit Client SDK (JavaScript, iOS, Android, Python)
+# Connect with any LiveKit Client SDK (JavaScript, iOS, Android, Python)
 ```
 
 ---
 
-### 6. Managing Profile & Developer API Keys
+### 6. Profile, Google Auth & API Keys
 
 ```python
-# Update display name
-client.me.update(display_name="Rahim Ahmed")
+# Synchronize Google / Firebase ID token
+auth_status = client.auth.sync_google(id_token="firebase_jwt_token_here")
+print("Synced User:", auth_status.user.email)
+
+# Update display settings
+client.me.update(display_name="Rahim Ahmed", avatar_url="https://example.com/avatar.png")
 
 # Provision a new API key
 new_key = client.api_keys.create(
@@ -319,20 +359,11 @@ except APIConnectionError:
 
 ---
 
-## 🚀 Automated PyPI Deployment
+## 🧪 Verification Suite
 
-This SDK includes a pre-configured GitHub Actions workflow in [`.github/workflows/pypi-publish.yml`](.github/workflows/pypi-publish.yml).
-
-To publish automatically to PyPI:
-1. Add your PyPI API token to your repository secrets as `PYPI_API_TOKEN` under **Settings > Secrets and variables > Actions**.
-2. Bump the `version` field in `pyproject.toml` and `bangla_ai/_version.py`.
-3. Push to `main`:
-   ```bash
-   git add .
-   git commit -m "release: v0.1.1"
-   git push origin main
-   ```
-4. GitHub Actions will build and publish the wheel and source distribution directly to PyPI.
+```bash
+python test.py
+```
 
 ---
 

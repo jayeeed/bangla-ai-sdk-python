@@ -4,6 +4,7 @@ from ._base import _BaseConfig, AsyncTransport, SyncTransport
 from ._constants import DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT
 from .resources.api_keys import ApiKeysResource, AsyncApiKeysResource
 from .resources.asr import ASRResource, AsyncASRResource
+from .resources.auth import AsyncAuthResource, AuthResource
 from .resources.chats import AsyncChatsResource, ChatsResource
 from .resources.me import AsyncMeResource, MeResource
 from .resources.ocr import AsyncOCRResource, OCRResource
@@ -43,6 +44,7 @@ class BanglaAI:
 
         # Modality Sub-resources
         self.me = MeResource(self._transport)
+        self.auth = AuthResource(self._transport)
         self.api_keys = ApiKeysResource(self._transport)
         self.ws_tickets = WsTicketsResource(self._transport)
         self.chats = ChatsResource(self._transport)
@@ -105,6 +107,7 @@ class AsyncBanglaAI:
 
         # Modality Sub-resources
         self.me = AsyncMeResource(self._transport)
+        self.auth = AsyncAuthResource(self._transport)
         self.api_keys = AsyncApiKeysResource(self._transport)
         self.ws_tickets = AsyncWsTicketsResource(self._transport)
         self.chats = AsyncChatsResource(self._transport)

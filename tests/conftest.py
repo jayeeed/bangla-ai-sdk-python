@@ -52,6 +52,24 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
             "is_active": True,
         })
 
+    # 2b. Auth / Google sync
+    if url_path in ("/v1/auth/google", "/auth/google", "/google") and method == "POST":
+        return httpx.Response(200, json={
+            "status": "synced",
+            "user": {
+                "id": "usr_test123",
+                "email": "google_user@test.org",
+                "display_name": "Google User",
+                "role": "user",
+                "plan": "free",
+                "is_active": True,
+            },
+            "synced": True,
+            "provider": "google",
+            "tier": "free",
+            "scopes": ["llm", "ocr", "asr", "tts", "sts"],
+        })
+
     # 3. API Keys
     if url_path == "/v1/api-keys" and method == "POST":
         body = json.loads(request.content.decode("utf-8"))
@@ -118,8 +136,35 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
             "is_archived": False,
             "active_branch_id": "brn_test123",
         })
+    if url_path == "/v1/chats/cht_test123" and method == "PATCH":
+        body = json.loads(request.content.decode("utf-8"))
+        return httpx.Response(200, json={
+            "id": "cht_test123",
+            "user_id": "usr_test123",
+            "title": body.get("title", "Updated title"),
+            "primary_service": "llm",
+            "is_archived": False,
+            "active_branch_id": "brn_test123",
+        })
+    if url_path == "/v1/chats/cht_test123/messages" and method == "GET":
+        return httpx.Response(200, json=[{
+            "id": "trn_test123",
+            "user_id": "usr_test123",
+            "chat_id": "cht_test123",
+            "input_content": "নমস্কার",
+            "output_text": "নমস্কার! কিভাবে সাহায্য করতে পারি?",
+            "status": "completed",
+        }])
+    if url_path == "/v1/chats/cht_test123/branches" and method == "POST":
+        return httpx.Response(200, json={
+            "id": "cht_test123",
+            "user_id": "usr_test123",
+            "title": "New session",
+            "active_branch_id": "brn_branch456",
+        })
     if url_path.endswith("/turns") and method == "POST":
-        # Return SSE text stream
+        # Check idempotency key header
+        assert "idempotency-key" in request.headers
         sse_content = (
             "event: turn_started\n"
             "data: {\"turn_id\": \"trn_test123\", \"branch_id\": \"brn_test123\"}\n\n"
@@ -145,7 +190,9 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
             "storage_key": "attachments/att_test123/sample.pdf",
             "is_attached": True,
         })
-    if "/download" in url_path and method == "GET":
+    if "/attachments/" in url_path and method == "DELETE":
+        return httpx.Response(204)
+    if "/attachments/" in url_path and "/download" in url_path and method == "GET":
         return httpx.Response(200, content=b"%PDF-1.4 mock binary pdf bytes", headers={"Content-Type": "application/pdf"})
 
     # 6. OCR
@@ -178,6 +225,18 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
             "duration_seconds": 2.5,
             "processing_time_ms": 310.0,
         })
+    if url_path == "/v1/asr/transcribe/offline/jobs" and method == "POST":
+        return httpx.Response(202, json={
+            "job_id": "job_asr123",
+            "status": "queued",
+            "status_url": "/v1/asr/jobs/job_asr123",
+        })
+    if url_path == "/v1/asr/jobs/job_asr123" and method == "GET":
+        return httpx.Response(200, json={
+            "job_id": "job_asr123",
+            "status": "completed",
+            "result": {"text": "অ্যাসিঙ্ক এএসআর ফলাফল।"},
+        })
     if url_path == "/v1/asr/transcribe/youtube" and method == "POST":
         return httpx.Response(200, json={
             "text": "ইউটিউব ভিডিওর ট্রান্সক্রিপ্ট।",
@@ -185,7 +244,13 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
             "duration_seconds": 60.0,
             "source_url": "https://youtube.com/watch?v=123",
         })
-    if url_path == "/v1/asr/streams" and method == "POST":
+    if url_path == "/v1/asr/transcribe/youtube/jobs" and method == "POST":
+        return httpx.Response(202, json={
+            "job_id": "job_yt123",
+            "status": "queued",
+            "status_url": "/v1/asr/jobs/job_yt123",
+        })
+    if url_path in ("/v1/asr/streams", "/v1/asr/stream/start") and method == "POST":
         return httpx.Response(200, json={"session_id": "str_asr123", "sample_rate": 16000})
     if "/chunk/pcm16" in url_path and method == "POST":
         return httpx.Response(200, json={
@@ -196,14 +261,69 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
         })
     if url_path.endswith("/finish") and method == "POST":
         return httpx.Response(200, json={"status": "finished", "session_id": "str_asr123"})
+    if url_path.endswith("/clear") and method == "POST":
+        return httpx.Response(200, json={"status": "cleared", "session_id": "str_asr123"})
+    if url_path.endswith("/keepalive") and method == "POST":
+        return httpx.Response(200, json={"status": "ok", "session_id": "str_asr123"})
 
     # 8. TTS
     if url_path == "/v1/tts/simple" and method == "POST":
         return httpx.Response(200, content=b"RIFFmockwavcontent", headers={"Content-Type": "audio/wav"})
     if url_path == "/v1/tts/simple/stream" and method == "POST":
         return httpx.Response(200, content=b"\x00\x01\x00\x02\x00\x03", headers={"Content-Type": "application/octet-stream"})
-    if url_path == "/v1/tts/models" and method == "GET":
+    if url_path in ("/v1/tts/models", "/v1/models") and method == "GET":
         return httpx.Response(200, json={"models": ["bosonai/higgs-tts-3-4b"], "voices": ["male", "female"], "default_voice": "male", "sample_rate": 24000})
+    if url_path in ("/v1/capabilities", "/v1/tts/capabilities") and method == "GET":
+        return httpx.Response(200, json={
+            "object": "tts_capabilities",
+            "model": "bosonai/higgs-tts-3-4b",
+            "streaming": True,
+            "voice_cloning": True,
+            "response_formats": ["wav", "mp3", "pcm"],
+        })
+    if url_path in ("/v1/queue", "/v1/tts/queue") and method == "GET":
+        return httpx.Response(200, json={
+            "object": "tts_queue",
+            "active": 0,
+            "queued": 0,
+            "capacity": 4,
+            "available": 4,
+        })
+    if url_path == "/v1/tts/voices" and method == "POST":
+        return httpx.Response(201, json={
+            "voice_id": "voice_hex1234567890abcdef12345678",
+            "status": "ready",
+            "duration_seconds": 4.2,
+        })
+    if url_path.startswith("/v1/tts/voices/") and method == "GET":
+        return httpx.Response(200, json={"voice_id": "voice_hex123", "status": "ready"})
+    if url_path.startswith("/v1/tts/voices/") and method == "DELETE":
+        return httpx.Response(204)
+    if url_path == "/v1/tts/simple/jobs" and method == "POST":
+        return httpx.Response(202, json={
+            "job_id": "job_tts123",
+            "status": "queued",
+            "status_url": "/v1/tts/jobs/job_tts123",
+        })
+    if url_path == "/v1/tts/jobs/job_tts123" and method == "GET":
+        return httpx.Response(200, json={
+            "job_id": "job_tts123",
+            "status": "completed",
+            "download_url": "/v1/tts/jobs/job_tts123/download",
+            "format": "wav",
+        })
+    if url_path == "/v1/tts/jobs/job_tts123/download" and method == "GET":
+        return httpx.Response(200, content=b"RIFFmockjobaudiowavbytes", headers={"Content-Type": "audio/wav"})
+    if url_path == "/v1/tts/sessions" and method == "POST":
+        return httpx.Response(200, json={
+            "object": "tts_session",
+            "session_id": "sess_tts123",
+            "status": "open",
+            "text_url": "/v1/tts/sessions/sess_tts123/text",
+            "finish_url": "/v1/tts/sessions/sess_tts123/finish",
+        })
+    if "/tts/sessions/" in url_path and method in ("POST", "DELETE"):
+        return httpx.Response(200, json={"status": "ok"})
 
     # 9. STS
     if url_path == "/v1/sts/voice/reference" and method == "POST":
@@ -219,7 +339,6 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
 def mock_client():
     """Returns a BanglaAI client connected to a mock transport."""
     client = BanglaAI(api_key="sk_live_test_api_key_valid")
-    # Swap out internal httpx.Client with MockTransport
     config = client._transport.config
     mock_transport = httpx.MockTransport(mock_handler)
     client._transport._client = httpx.Client(

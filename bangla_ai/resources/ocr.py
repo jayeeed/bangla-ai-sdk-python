@@ -2,7 +2,7 @@ import asyncio
 import os
 import time
 from typing import BinaryIO, Optional, Union
-from urllib.parse import quote
+
 from .._base import AsyncTransport, SyncTransport
 from ..exceptions import BanglaAIError
 from ..types.ocr import OCRJob, OCRResult
@@ -14,7 +14,13 @@ class OCRResource:
     def __init__(self, transport: SyncTransport) -> None:
         self._transport = transport
 
-    def process(self, file: Union[str, bytes, BinaryIO], filename: Optional[str] = None) -> OCRResult:
+    def process(
+        self,
+        file: Union[str, bytes, BinaryIO],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> OCRResult:
         """
         Synchronous document OCR for single-page documents and images.
         Returns layout regions, pages, and extracted Bengali Markdown.
@@ -31,10 +37,22 @@ class OCRResource:
             content = file.read()
 
         files = {"file": (fn, content)}
-        data = self._transport.post_multipart("/v1/ocr", files=files)
+        params = {}
+        if languages:
+            params["languages"] = languages
+        if output_format:
+            params["output_format"] = output_format
+
+        data = self._transport.post_multipart("/v1/ocr", files=files, params=params or None)
         return OCRResult.model_validate(data)
 
-    def create_job(self, file: Union[str, bytes, BinaryIO], filename: Optional[str] = None) -> OCRJob:
+    def create_job(
+        self,
+        file: Union[str, bytes, BinaryIO],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> OCRJob:
         """
         Asynchronously submits a multi-page document or batch for OCR processing.
         Returns an OCRJob with status 'queued'.
@@ -51,17 +69,25 @@ class OCRResource:
             content = file.read()
 
         files = {"file": (fn, content)}
-        data = self._transport.post_multipart("/v1/ocr/jobs", files=files)
+        params = {}
+        if languages:
+            params["languages"] = languages
+        if output_format:
+            params["output_format"] = output_format
+
+        data = self._transport.post_multipart("/v1/ocr/jobs", files=files, params=params or None)
         return OCRJob.model_validate(data)
 
     def get_job(self, job_id: str) -> OCRJob:
         """Poll status and retrieve result of an asynchronous Document OCR job."""
-        data = self._transport.request("GET", f"/v1/ocr/jobs/{quote(str(job_id), safe='')}")
+        data = self._transport.request("GET", f"/v1/ocr/jobs/{job_id}")
         return OCRJob.model_validate(data)
 
     def wait_for_job(
         self,
         job_or_file: Union[str, bytes, BinaryIO, OCRJob],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
         filename: Optional[str] = None,
         timeout: float = 300.0,
         poll_interval: float = 2.0,
@@ -71,21 +97,18 @@ class OCRResource:
         """
         if isinstance(job_or_file, OCRJob):
             job_id = job_or_file.job_id
-        elif isinstance(job_or_file, str) and job_or_file.startswith("job_"):
+        elif isinstance(job_or_file, str) and (job_or_file.startswith("ocr_job_") or job_or_file.startswith("job_")):
             job_id = job_or_file
         else:
-            job = self.create_job(job_or_file, filename=filename)
+            job = self.create_job(job_or_file, languages=languages, output_format=output_format, filename=filename)
             job_id = job.job_id
-
-        if not job_id:
-            raise BanglaAIError("Failed to initiate OCR job: response did not include a valid job_id.")
 
         start_time = time.time()
         while time.time() - start_time < timeout:
             status = self.get_job(job_id)
-            if status.status == "completed":
+            if status.status in ("completed", "done", "SUCCESS"):
                 return status
-            elif status.status == "failed":
+            elif status.status in ("failed", "error", "FAILURE"):
                 raise BanglaAIError(f"OCR job {job_id} failed: {status.error or 'Unknown error'}")
             time.sleep(poll_interval)
 
@@ -98,10 +121,15 @@ class AsyncOCRResource:
     def __init__(self, transport: AsyncTransport) -> None:
         self._transport = transport
 
-    async def process(self, file: Union[str, bytes, BinaryIO], filename: Optional[str] = None) -> OCRResult:
+    async def process(
+        self,
+        file: Union[str, bytes, BinaryIO],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> OCRResult:
         """
         Synchronous document OCR for single-page documents and images.
-        Returns layout regions, pages, and extracted Bengali Markdown.
         """
         if isinstance(file, str):
             fn = filename or os.path.basename(file)
@@ -115,13 +143,24 @@ class AsyncOCRResource:
             content = file.read()
 
         files = {"file": (fn, content)}
-        data = await self._transport.post_multipart("/v1/ocr", files=files)
+        params = {}
+        if languages:
+            params["languages"] = languages
+        if output_format:
+            params["output_format"] = output_format
+
+        data = await self._transport.post_multipart("/v1/ocr", files=files, params=params or None)
         return OCRResult.model_validate(data)
 
-    async def create_job(self, file: Union[str, bytes, BinaryIO], filename: Optional[str] = None) -> OCRJob:
+    async def create_job(
+        self,
+        file: Union[str, bytes, BinaryIO],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> OCRJob:
         """
         Asynchronously submits a multi-page document or batch for OCR processing.
-        Returns an OCRJob with status 'queued'.
         """
         if isinstance(file, str):
             fn = filename or os.path.basename(file)
@@ -135,17 +174,25 @@ class AsyncOCRResource:
             content = file.read()
 
         files = {"file": (fn, content)}
-        data = await self._transport.post_multipart("/v1/ocr/jobs", files=files)
+        params = {}
+        if languages:
+            params["languages"] = languages
+        if output_format:
+            params["output_format"] = output_format
+
+        data = await self._transport.post_multipart("/v1/ocr/jobs", files=files, params=params or None)
         return OCRJob.model_validate(data)
 
     async def get_job(self, job_id: str) -> OCRJob:
         """Poll status and retrieve result of an asynchronous Document OCR job."""
-        data = await self._transport.request("GET", f"/v1/ocr/jobs/{quote(str(job_id), safe='')}")
+        data = await self._transport.request("GET", f"/v1/ocr/jobs/{job_id}")
         return OCRJob.model_validate(data)
 
     async def wait_for_job(
         self,
         job_or_file: Union[str, bytes, BinaryIO, OCRJob],
+        languages: Optional[str] = None,
+        output_format: Optional[str] = None,
         filename: Optional[str] = None,
         timeout: float = 300.0,
         poll_interval: float = 2.0,
@@ -155,21 +202,18 @@ class AsyncOCRResource:
         """
         if isinstance(job_or_file, OCRJob):
             job_id = job_or_file.job_id
-        elif isinstance(job_or_file, str) and job_or_file.startswith("job_"):
+        elif isinstance(job_or_file, str) and (job_or_file.startswith("ocr_job_") or job_or_file.startswith("job_")):
             job_id = job_or_file
         else:
-            job = await self.create_job(job_or_file, filename=filename)
+            job = await self.create_job(job_or_file, languages=languages, output_format=output_format, filename=filename)
             job_id = job.job_id
-
-        if not job_id:
-            raise BanglaAIError("Failed to initiate OCR job: response did not include a valid job_id.")
 
         start_time = time.time()
         while time.time() - start_time < timeout:
             status = await self.get_job(job_id)
-            if status.status == "completed":
+            if status.status in ("completed", "done", "SUCCESS"):
                 return status
-            elif status.status == "failed":
+            elif status.status in ("failed", "error", "FAILURE"):
                 raise BanglaAIError(f"OCR job {job_id} failed: {status.error or 'Unknown error'}")
             await asyncio.sleep(poll_interval)
 

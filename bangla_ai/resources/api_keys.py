@@ -1,5 +1,4 @@
 from typing import List, Optional
-from urllib.parse import quote
 from .._base import AsyncTransport, SyncTransport
 from ..types.auth import ApiKey
 
@@ -42,7 +41,7 @@ class ApiKeysResource:
 
     def delete(self, key_id: str) -> None:
         """Revoke a developer API key instantly."""
-        self._transport.request("DELETE", f"/v1/api-keys/{quote(str(key_id), safe='')}")
+        self._transport.request("DELETE", f"/v1/api-keys/{key_id}")
 
 
 class AsyncApiKeysResource:
@@ -83,4 +82,4 @@ class AsyncApiKeysResource:
 
     async def delete(self, key_id: str) -> None:
         """Revoke a developer API key instantly."""
-        await self._transport.request("DELETE", f"/v1/api-keys/{quote(str(key_id), safe='')}")
+        await self._transport.request("DELETE", f"/v1/api-keys/{key_id}")

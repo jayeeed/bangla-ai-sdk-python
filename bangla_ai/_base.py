@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import time
@@ -114,6 +113,8 @@ class SyncTransport:
         method: str,
         path: str,
         json: Optional[Any] = None,
+        data: Optional[Any] = None,
+        content: Optional[Union[bytes, str]] = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Any:
@@ -121,17 +122,9 @@ class SyncTransport:
         retries = 0
         while True:
             try:
-                resp = self._client.request(method, url, json=json, params=params, headers=headers)
-                if (resp.status_code == 429 or resp.status_code == 503) and retries < self.config.max_retries:
-                    retries += 1
-                    retry_after_hdr = resp.headers.get("Retry-After")
-                    try:
-                        delay = float(retry_after_hdr) if retry_after_hdr else 0.5 * (2 ** (retries - 1))
-                    except ValueError:
-                        delay = 0.5 * (2 ** (retries - 1))
-                    time.sleep(delay)
-                    continue
-
+                resp = self._client.request(
+                    method, url, json=json, data=data, content=content, params=params, headers=headers
+                )
                 _handle_error_response(resp)
                 if resp.status_code == 204:
                     return None
@@ -171,40 +164,29 @@ class SyncTransport:
         path: str,
         json_body: Optional[Any] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         url = path if path.startswith("http") else f"{self.config.base_url}{path}"
-        headers = {"Accept": "text/event-stream"}
+        req_headers = {"Accept": "text/event-stream"}
+        if headers:
+            req_headers.update(headers)
         try:
-            with self._client.stream("POST", url, json=json_body, params=params, headers=headers) as resp:
+            with self._client.stream("POST", url, json=json_body, params=params, headers=req_headers) as resp:
                 _handle_error_response(resp)
                 current_event = "message"
-                data_lines = []
                 for line in resp.iter_lines():
-                    trimmed = line.strip()
-                    if not trimmed:
-                        if data_lines:
-                            data_str = "\n".join(data_lines)
-                            try:
-                                parsed_data = json.loads(data_str)
-                            except Exception:
-                                parsed_data = data_str
-                            yield {"event": current_event, "data": parsed_data}
-                            current_event = "message"
-                            data_lines = []
+                    if not line:
                         continue
-                    if trimmed.startswith(":"):
-                        continue
-                    if trimmed.startswith("event:"):
-                        current_event = trimmed[6:].strip()
-                    elif trimmed.startswith("data:"):
-                        data_lines.append(trimmed[5:].strip())
-                if data_lines:
-                    data_str = "\n".join(data_lines)
-                    try:
-                        parsed_data = json.loads(data_str)
-                    except Exception:
-                        parsed_data = data_str
-                    yield {"event": current_event, "data": parsed_data}
+                    if line.startswith("event: "):
+                        current_event = line[7:].strip()
+                    elif line.startswith("data: "):
+                        data_str = line[6:].strip()
+                        try:
+                            parsed_data = json.loads(data_str)
+                        except Exception:
+                            parsed_data = data_str
+                        yield {"event": current_event, "data": parsed_data}
+                        current_event = "message"
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise APIConnectionError(f"Streaming connection failed to {url}: {str(exc)}") from exc
 
@@ -213,10 +195,11 @@ class SyncTransport:
         path: str,
         json_body: Optional[Any] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Generator[bytes, None, None]:
         url = path if path.startswith("http") else f"{self.config.base_url}{path}"
         try:
-            with self._client.stream("POST", url, json=json_body, params=params) as resp:
+            with self._client.stream("POST", url, json=json_body, params=params, headers=headers) as resp:
                 _handle_error_response(resp)
                 for chunk in resp.iter_bytes():
                     if chunk:
@@ -245,37 +228,25 @@ class AsyncTransport:
         method: str,
         path: str,
         json: Optional[Any] = None,
+        data: Optional[Any] = None,
+        content: Optional[Union[bytes, str]] = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Any:
         url = path if path.startswith("http") else f"{self.config.base_url}{path}"
-        retries = 0
-        while True:
-            try:
-                resp = await self._client.request(method, url, json=json, params=params, headers=headers)
-                if (resp.status_code == 429 or resp.status_code == 503) and retries < self.config.max_retries:
-                    retries += 1
-                    retry_after_hdr = resp.headers.get("Retry-After")
-                    try:
-                        delay = float(retry_after_hdr) if retry_after_hdr else 0.5 * (2 ** (retries - 1))
-                    except ValueError:
-                        delay = 0.5 * (2 ** (retries - 1))
-                    await asyncio.sleep(delay)
-                    continue
-
-                _handle_error_response(resp)
-                if resp.status_code == 204:
-                    return None
-                content_type = resp.headers.get("content-type", "")
-                if "application/json" in content_type:
-                    return resp.json()
-                return resp.content
-            except (httpx.ConnectError, httpx.TimeoutException) as exc:
-                if retries < self.config.max_retries:
-                    retries += 1
-                    await asyncio.sleep(0.5 * (2 ** (retries - 1)))
-                    continue
-                raise APIConnectionError(f"Connection failed to {url}: {str(exc)}") from exc
+        try:
+            resp = await self._client.request(
+                method, url, json=json, data=data, content=content, params=params, headers=headers
+            )
+            _handle_error_response(resp)
+            if resp.status_code == 204:
+                return None
+            content_type = resp.headers.get("content-type", "")
+            if "application/json" in content_type:
+                return resp.json()
+            return resp.content
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            raise APIConnectionError(f"Connection failed to {url}: {str(exc)}") from exc
 
     async def post_multipart(
         self,
@@ -302,40 +273,29 @@ class AsyncTransport:
         path: str,
         json_body: Optional[Any] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         url = path if path.startswith("http") else f"{self.config.base_url}{path}"
-        headers = {"Accept": "text/event-stream"}
+        req_headers = {"Accept": "text/event-stream"}
+        if headers:
+            req_headers.update(headers)
         try:
-            async with self._client.stream("POST", url, json=json_body, params=params, headers=headers) as resp:
+            async with self._client.stream("POST", url, json=json_body, params=params, headers=req_headers) as resp:
                 _handle_error_response(resp)
                 current_event = "message"
-                data_lines = []
                 async for line in resp.aiter_lines():
-                    trimmed = line.strip()
-                    if not trimmed:
-                        if data_lines:
-                            data_str = "\n".join(data_lines)
-                            try:
-                                parsed_data = json.loads(data_str)
-                            except Exception:
-                                parsed_data = data_str
-                            yield {"event": current_event, "data": parsed_data}
-                            current_event = "message"
-                            data_lines = []
+                    if not line:
                         continue
-                    if trimmed.startswith(":"):
-                        continue
-                    if trimmed.startswith("event:"):
-                        current_event = trimmed[6:].strip()
-                    elif trimmed.startswith("data:"):
-                        data_lines.append(trimmed[5:].strip())
-                if data_lines:
-                    data_str = "\n".join(data_lines)
-                    try:
-                        parsed_data = json.loads(data_str)
-                    except Exception:
-                        parsed_data = data_str
-                    yield {"event": current_event, "data": parsed_data}
+                    if line.startswith("event: "):
+                        current_event = line[7:].strip()
+                    elif line.startswith("data: "):
+                        data_str = line[6:].strip()
+                        try:
+                            parsed_data = json.loads(data_str)
+                        except Exception:
+                            parsed_data = data_str
+                        yield {"event": current_event, "data": parsed_data}
+                        current_event = "message"
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise APIConnectionError(f"Streaming connection failed to {url}: {str(exc)}") from exc
 
@@ -344,10 +304,11 @@ class AsyncTransport:
         path: str,
         json_body: Optional[Any] = None,
         params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> AsyncGenerator[bytes, None]:
         url = path if path.startswith("http") else f"{self.config.base_url}{path}"
         try:
-            async with self._client.stream("POST", url, json=json_body, params=params) as resp:
+            async with self._client.stream("POST", url, json=json_body, params=params, headers=headers) as resp:
                 _handle_error_response(resp)
                 async for chunk in resp.aiter_bytes():
                     if chunk:

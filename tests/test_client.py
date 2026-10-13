@@ -37,6 +37,13 @@ def test_user_profile_and_update(mock_client):
     assert updated.display_name == "New Name"
 
 
+def test_google_auth_sync(mock_client):
+    res = mock_client.auth.sync_google(id_token="mock_google_id_token_123")
+    assert res.synced is True
+    assert res.provider == "google"
+    assert res.user.email == "google_user@test.org"
+
+
 def test_api_keys_crud(mock_client):
     new_key = mock_client.api_keys.create(name="My Integration Key", scopes=["llm", "ocr"])
     assert new_key.id == "key_test123"
