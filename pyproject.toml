@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bangla-ai-sdk"
-version = "0.2.0"
+version = "0.1.0"
 description = "Official Python SDK for the Bangla AI Gateway (LLM, OCR, ASR, TTS, STS)."
 readme = "README.md"
 license = "MIT"
@@ -20,8 +20,8 @@ dependencies = [
 requires-python = ">=3.9"
 
 [project.urls]
-Homepage = "https://github.com/jayeeed/bangla-ai-sdk-python"
-Repository = "https://github.com/jayeeed/bangla-ai-sdk-python"
+Homepage = "https://github.com/jayeeed/bangla-ai"
+Repository = "https://github.com/jayeeed/bangla-ai"
 Documentation = "https://banglai.acimisai.com/api/docs"
 
 [tool.setuptools.packages.find]
