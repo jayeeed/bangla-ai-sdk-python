@@ -3,7 +3,7 @@
 ![Async](https://img.shields.io/badge/async-supported-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PyPI version](https://img.shields.io/badge/pypi-0.1.0-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
+[![PyPI version](https://img.shields.io/badge/pypi-0.2.1-orange.svg)](https://pypi.org/project/bangla-ai-sdk/)
 
 Official Python SDK for the **Bangla AI Gateway**. Easily connect your Python applications to state-of-the-art Bengali language AI microservices:
 - 💬 **Large Language Model (LLM)**: Multi-branch conversation trees, message turn history, automatic idempotency keys, and token-by-token SSE streaming.
